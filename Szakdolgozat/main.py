@@ -18,23 +18,25 @@ def send_data(values):
             "SoilMoisture": values[3]
         }
     })
-    urequests.request("POST", insertUrl, headers=headers, data=insert)
+    #urequests.request("POST", insertUrl, headers=headers, data=insert)
     return insert
 
 def analog_read_light():
     light1.on()
     soil1.off()
-    max_light=150
-    min_light=950
-    light = (max_light-analog.read())*100/(max_light-min_light)
+    time.sleep(1)
+    max_light=950
+    min_light=0
+    light = (analog.read() - min_light) / (max_light - min_light) * 100
     return light
 
 def analog_read_soil():
     light1.off()
     soil1.on()
-    max_moisture=31231
-    min_moisture=9599
-    moisture = (max_moisture-analog.read_u16())*100/(max_moisture-min_moisture)
+    time.sleep(1)
+    min_moisture=31551
+    max_moisture=9215
+    moisture = (analog.read_u16() - min_moisture) / (max_moisture - min_moisture) * 100
     return moisture
 
 def digial_read_temp():
@@ -55,7 +57,6 @@ def avg_data(samplesize,interval):
         sum_temp += digial_read_temp()[0]
         sum_humid += digial_read_temp()[1]
         sum_soil += analog_read_soil()
-        #print(i)
         time.sleep(interval)
         i+=1
 
@@ -67,15 +68,25 @@ def avg_data(samplesize,interval):
 
     return [avg_light,avg_temp,avg_humid,avg_soil]
 
+def waterpump_toggle(moisture):
+    if moisture<10:
+            relay1.on()
+            time.sleep(3)
+            relay1.off()
+
 hiba=False
 while not hiba:
     try:
         #20 minta 30s-enként = 10perc
-        send=send_data(avg_data(5,1))
+        avg=avg_data(5,1)
+        send=send_data(avg)
         print(send)
         print()
-          
+        waterpump_toggle(avg[3])
+        
+
     except Exception as e:
+        relay1.off()
         print(e)
         led.off()
         hiba=True  
