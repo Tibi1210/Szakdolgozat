@@ -1,25 +1,29 @@
 def send_data(values):
     try:
         ntptime.settime()  
-    except:
+    except:  
+        time.sleep(1)
         send_data(values)
-
-    timedifference=946681200
-    timestamp = time.mktime(time.localtime())+timedifference
-    insert = json.dumps({
-        "collection": "plant1",
-        "database": "plants",
-        "dataSource": "Cluster0",
-        "document": {
-            "Timestamp": timestamp, 
-            "Light": values[0],
-            "Temperature": values[1],
-            "Humidity": values[2],
-            "SoilMoisture": values[3]
-        }
-    })
-    #urequests.request("POST", insertUrl, headers=headers, data=insert)
-    return insert
+    try:
+        timedifference=946681200
+        timestamp = time.mktime(time.localtime())+timedifference
+        insert = json.dumps({
+            "collection": "plant1",
+            "database": "plants",
+            "dataSource": "Cluster0",
+            "document": {
+                "Timestamp": timestamp, 
+                "Light": values[0],
+                "Temperature": values[1],
+                "Humidity": values[2],
+                "SoilMoisture": values[3],
+                "delete": 1
+            }
+        })
+        urequests.request("POST", insertUrl, headers=headers, data=insert)
+        return insert
+    except Exception as e:
+        raise Exception("send_data(): "+str(e))
 
 def analog_read_light():
     light1.on()
@@ -39,34 +43,53 @@ def analog_read_soil():
     moisture = (analog.read_u16() - min_moisture) / (max_moisture - min_moisture) * 100
     return moisture
 
+def measureDHT():
+    try:
+        temp1.measure()
+    except:
+        time.sleep(1)
+        measureDHT()
+
 def digial_read_temp():
+    measureDHT()
     temp = temp1.temperature()
     hum = temp1.humidity()
     return [temp,hum]
 
-def avg_data(samplesize,interval):
-    sum_light=0
-    sum_temp=0
-    sum_soil=0
-    sum_humid=0
+def avg_data(value):
+    try:
+        samplesize=value*2
+        interval=round(86400/value/samplesize)
+        if interval<1:
+            interval=1
 
-    i=0
-    while i<samplesize:
-        temp1.measure()
-        sum_light += analog_read_light()
-        sum_temp += digial_read_temp()[0]
-        sum_humid += digial_read_temp()[1]
-        sum_soil += analog_read_soil()
-        time.sleep(interval)
-        i+=1
+        sum_light=0
+        sum_temp=0
+        sum_soil=0
+        sum_humid=0
 
-    i=0
-    avg_light=sum_light/samplesize
-    avg_temp=sum_temp/samplesize
-    avg_humid=sum_humid/samplesize
-    avg_soil=sum_soil/samplesize
+        i=0
+        samplesize=5
+        interval=1
+        while i<samplesize:
+            temp,hum=digial_read_temp()
 
-    return [avg_light,avg_temp,avg_humid,avg_soil]
+            sum_light += analog_read_light()
+            sum_temp += temp
+            sum_humid += hum
+            sum_soil += analog_read_soil()
+            time.sleep(interval)
+            i+=1
+
+        i=0
+        avg_light=sum_light/samplesize
+        avg_temp=sum_temp/samplesize
+        avg_humid=sum_humid/samplesize
+        avg_soil=sum_soil/samplesize
+
+        return [avg_light,avg_temp,avg_humid,avg_soil]
+    except Exception as e:
+        raise Exception("avg_data(): "+str(e))
 
 def waterpump_toggle(moisture):
     if moisture<10:
@@ -74,20 +97,64 @@ def waterpump_toggle(moisture):
             time.sleep(3)
             relay1.off()
 
+def get_interval():
+    try:
+        findData = json.dumps({
+            "collection": "device1",
+            "database": "devices",
+            "dataSource": "Cluster0",
+            "projection": {
+                "_id": 0,
+                "interval": 1,
+                "pump": 1
+            },
+            "filter": {
+            "_id": 1
+            }
+        })
+        dataResponse = json.loads(urequests.request("POST", findOneUrl, headers=headers, data=findData).text)
+        return dataResponse['document']['interval']
+    except Exception as e:
+        raise Exception("get_interval(): "+str(e))
+
+
+
+
+
 hiba=False
 while not hiba:
-    try:
-        #20 minta 30s-enként = 10perc
-        avg=avg_data(5,1)
-        send=send_data(avg)
+    try:    
+        interval=get_interval()
+
+        avg=avg_data(interval)  
+
+        send=send_data(avg) 
         print(send)
         print()
-        waterpump_toggle(avg[3])
-        
+
+        #waterpump_toggle(avg[3])
 
     except Exception as e:
         relay1.off()
-        print(e)
         led.off()
-        hiba=True  
+        hiba=True
+
+        html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>My MicroPython Web Server</title>
+        </head>
+        <body>
+            <h1>MAIN</h1>
+            <h2>"""+str(e)+"""</h2>
+        </body>
+        </html>
+        """
+
+        client_sock, client_addr = server_sock.accept()
+        serve(client_sock,html)
+
+
+        
     

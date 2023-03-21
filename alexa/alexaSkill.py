@@ -1,10 +1,4 @@
-# -*- coding: utf-8 -*-
 
-# This sample demonstrates handling intents from an Alexa skill using the Alexa Skills Kit SDK for Python.
-# Please visit https://alexa.design/cookbook for additional examples on implementing slots, dialog management,
-# session persistence, api calls, and more.
-# This sample is built using the handler classes approach in skill builder.
-import logging
 import ask_sdk_core.utils as ask_utils
 
 from ask_sdk_core.skill_builder import SkillBuilder
@@ -12,70 +6,42 @@ from ask_sdk_core.dispatch_components import AbstractRequestHandler
 from ask_sdk_core.dispatch_components import AbstractExceptionHandler
 from ask_sdk_core.handler_input import HandlerInput
 
+from ask_sdk_model import IntentConfirmationStatus
 from ask_sdk_model import Response
 
 import requests
 import json
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
 
 findOneUrl = "https://data.mongodb-api.com/app/data-ojsvg/endpoint/data/v1/action/findOne"
 findUrl = "https://data.mongodb-api.com/app/data-ojsvg/endpoint/data/v1/action/find"
+deleteUrl = "https://data.mongodb-api.com/app/data-ojsvg/endpoint/data/v1/action/deleteMany"
+updateUrl = "https://data.mongodb-api.com/app/data-ojsvg/endpoint/data/v1/action/updateOne"
 
+api=""
 headers = {
-    'Content-Type': 'application/json',
-    'Access-Control-Request-Headers': '*',
-    'api-key': "",
+  'Content-Type': 'application/json',
+  'Access-Control-Request-Headers': '*',
+  'api-key': api, 
 }
 
-class LaunchRequestHandler(AbstractRequestHandler):
-    """Handler for Skill Launch."""
-    def can_handle(self, handler_input):
-        # type: (HandlerInput) -> bool
 
+class LaunchRequestHandler(AbstractRequestHandler):
+    def can_handle(self, handler_input):
         return ask_utils.is_request_type("LaunchRequest")(handler_input)
 
     def handle(self, handler_input):
-        # type: (HandlerInput) -> Response
-        speak_output = "Welcome, what do you want to know about your plants?"
+        return handler_input.response_builder.speak("Welcome, what do you want to know about your plants?").response
 
-        return (
-            handler_input.response_builder
-                .speak(speak_output)
-                .ask(speak_output)
-                .response
-        )
-
-
-class HelloWorldIntentHandler(AbstractRequestHandler):
-    """Handler for Hello World Intent."""
-    def can_handle(self, handler_input):
-        # type: (HandlerInput) -> bool
-        return ask_utils.is_intent_name("HelloWorldIntent")(handler_input)
-
-    def handle(self, handler_input):
-        # type: (HandlerInput) -> Response
-        speak_output = "Hello World!"
-
-        return (
-            handler_input.response_builder
-                .speak(speak_output)
-                # .ask("add a reprompt if you want to keep the session open for the user to respond")
-                .response
-        )
 
 
 class getSensorDataIntentHandler(AbstractRequestHandler):
     def can_handle(self, handler_input):
-        # type: (HandlerInput) -> bool
         return ask_utils.is_intent_name("getSensorDataIntent")(handler_input)
 
     def handle(self, handler_input):
-        # type: (HandlerInput) -> Response
-        
-        find = json.dumps({
+
+        findData = json.dumps({
             "collection": "plant1",
             "database": "plants",
             "dataSource": "Cluster0",
@@ -91,126 +57,167 @@ class getSensorDataIntentHandler(AbstractRequestHandler):
             "limit": 1
         })
 
+        dataResponse = json.loads(requests.request("POST", findUrl, headers=headers, data=findData).text)
+
+        try:
+            speak_output = "On your plant, the latest sensor values measured are: Light: " + str(dataResponse["documents"][0]["Light"]) + ", Temperature: " + str(dataResponse["documents"][0]["Temperature"]) + ", Humidity: " + str(dataResponse["documents"][0]["Humidity"])  + ", SoilMoisture: " + str(dataResponse["documents"][0]["SoilMoisture"]) 
+        except:
+            speak_output = "The database is probably empty."
+
+        return handler_input.response_builder.speak(speak_output).response
+
+
+class getOneSensorValueIntentHandler(AbstractRequestHandler):
+    def can_handle(self, handler_input):
+        return ask_utils.is_intent_name("getOneSensorValueIntent")(handler_input)
+
+    def handle(self, handler_input):
         
-        response = requests.request("POST", findUrl, headers=headers, data=find)
-        y = json.loads(response.text)
+        findData = json.dumps({
+            "collection": "plant1",
+            "database": "plants",
+            "dataSource": "Cluster0",
+            "projection": {
+                "_id": 0,
+                "Light": 1,
+                "Temperature": 1,
+                "Humidity": 1,
+                "SoilMoisture": 1,
+                "Timestamp": 1
+            },
+            "sort": { "Timestamp": -1 },
+            "limit": 1
+        })
+        
+        dataResponse = json.loads(requests.request("POST", findUrl, headers=headers, data=findData).text)
+        
+        slot_value = handler_input.request_envelope.request.intent.slots['sensor'].resolutions.resolutions_per_authority[0].values[0].value.name
 
-        speak_output = "On your plant, the latest sensor values measured are: Light:" + str(y["documents"][0]["Light"]) + " Temperature: " + str(y["documents"][0]["Temperature"]) + " Humidity: " + str(y["documents"][0]["Humidity"])  + " SoilMoisture: " + str(y["documents"][0]["SoilMoisture"]) 
+        try:
+            speak_output = "On your plant, the latest "+slot_value+" value measured is: " + str(dataResponse["documents"][0][slot_value])
+        except:
+            speak_output = "The database is probably empty. ("+slot_value+")"
 
-        return (
-            handler_input.response_builder
-                .speak(speak_output)
-                # .ask("add a reprompt if you want to keep the session open for the user to respond")
-                .response
+        return handler_input.response_builder.speak(speak_output).response
+
+
+class deleteValuesIntentHandler(AbstractRequestHandler):
+    def can_handle(self, handler_input):
+        return ask_utils.is_intent_name("deleteValuesIntent")(handler_input)
+
+    def handle(self, handler_input):
+        
+        confirmation_status = handler_input.request_envelope.request.intent.confirmation_status
+
+        if confirmation_status == IntentConfirmationStatus.DENIED:
+            speak_output = 'Okay, I won\'t do that.'
+        elif confirmation_status == IntentConfirmationStatus.CONFIRMED:
+            speak_output = 'Great, your data will be erased.'
+            
+        dataDelete = json.dumps({
+            "collection": "plant1",
+            "database": "plants",
+            "dataSource": "Cluster0",
+            "filter": { "delete": 1 },
+              }
+        )
+        
+        requests.request("POST", deleteUrl, headers=headers, data=dataDelete)
+            
+        return handler_input.response_builder.speak(speak_output).response
+
+
+
+class changeIntervalIntentHandler(AbstractRequestHandler):
+    def can_handle(self, handler_input):
+        return ask_utils.is_intent_name("changeIntervalIntent")(handler_input)
+
+    def handle(self, handler_input):
+
+        try:
+            slot_value = int(handler_input.request_envelope.request.intent.slots['number'].value)
+            if slot_value<=0:
+                raise Exception("negative") 
+        except:
+            return handler_input.response_builder.speak("You must choose a non-negative whole number, please try again.").response
+        
+        data = json.dumps({
+            "collection": "device1",
+            "database": "devices",
+            "dataSource": "Cluster0",
+            "filter": { "_id": 1 },
+              "update": {
+                  "$set": {
+                      "interval": int(slot_value),
+                      }
+                  }
+              }
         )
 
-
-
-
-
-
-
-
+        try:
+            response = requests.request("POST", updateUrl, headers=headers, data=data)
+            speak_output = "Your scanning interval will be changed to "+str(slot_value)+" times a day, after the next scan."
+        except:
+            speak_output = "Something went wrong while changing the interval."
+        
+        return handler_input.response_builder.speak(speak_output).response
 
 
 class HelpIntentHandler(AbstractRequestHandler):
-    """Handler for Help Intent."""
     def can_handle(self, handler_input):
-        # type: (HandlerInput) -> bool
         return ask_utils.is_intent_name("AMAZON.HelpIntent")(handler_input)
 
     def handle(self, handler_input):
-        # type: (HandlerInput) -> Response
-        speak_output = "You can say hello to me! How can I help?"
+        speak_output = "You can ask me about your plants data values or set the measuring interval for the sensors! How can I help?"
 
-        return (
-            handler_input.response_builder
-                .speak(speak_output)
-                .ask(speak_output)
-                .response
-        )
+        return handler_input.response_builder.speak(speak_output).response
 
 
 class CancelOrStopIntentHandler(AbstractRequestHandler):
-    """Single handler for Cancel and Stop Intent."""
     def can_handle(self, handler_input):
-        # type: (HandlerInput) -> bool
         return (ask_utils.is_intent_name("AMAZON.CancelIntent")(handler_input) or
                 ask_utils.is_intent_name("AMAZON.StopIntent")(handler_input))
 
     def handle(self, handler_input):
-        # type: (HandlerInput) -> Response
         speak_output = "Goodbye!"
 
-        return (
-            handler_input.response_builder
-                .speak(speak_output)
-                .response
-        )
+        return handler_input.response_builder.speak(speak_output).response
+
 
 class FallbackIntentHandler(AbstractRequestHandler):
-    """Single handler for Fallback Intent."""
     def can_handle(self, handler_input):
-        # type: (HandlerInput) -> bool
         return ask_utils.is_intent_name("AMAZON.FallbackIntent")(handler_input)
 
     def handle(self, handler_input):
-        # type: (HandlerInput) -> Response
-        logger.info("In FallbackIntentHandler")
         speech = "Hmm, I'm not sure."
         reprompt = "I didn't catch that. What can I help you with?"
 
         return handler_input.response_builder.speak(speech).ask(reprompt).response
 
 class SessionEndedRequestHandler(AbstractRequestHandler):
-    """Handler for Session End."""
     def can_handle(self, handler_input):
-        # type: (HandlerInput) -> bool
         return ask_utils.is_request_type("SessionEndedRequest")(handler_input)
 
     def handle(self, handler_input):
-        # type: (HandlerInput) -> Response
-
-        # Any cleanup logic goes here.
 
         return handler_input.response_builder.response
 
-
 class IntentReflectorHandler(AbstractRequestHandler):
-    """The intent reflector is used for interaction model testing and debugging.
-    It will simply repeat the intent the user said. You can create custom handlers
-    for your intents by defining them above, then also adding them to the request
-    handler chain below.
-    """
     def can_handle(self, handler_input):
-        # type: (HandlerInput) -> bool
         return ask_utils.is_request_type("IntentRequest")(handler_input)
 
     def handle(self, handler_input):
-        # type: (HandlerInput) -> Response
         intent_name = ask_utils.get_intent_name(handler_input)
         speak_output = "You just triggered " + intent_name + "."
 
-        return (
-            handler_input.response_builder
-                .speak(speak_output)
-                # .ask("add a reprompt if you want to keep the session open for the user to respond")
-                .response
-        )
+        return handler_input.response_builder.speak(speak_output).response
 
 
 class CatchAllExceptionHandler(AbstractExceptionHandler):
-    """Generic error handling to capture any syntax or routing errors. If you receive an error
-    stating the request handler chain is not found, you have not implemented a handler for
-    the intent being invoked or included it in the skill builder below.
-    """
     def can_handle(self, handler_input, exception):
-        # type: (HandlerInput, Exception) -> bool
         return True
 
     def handle(self, handler_input, exception):
-        # type: (HandlerInput, Exception) -> Response
-        logger.error(exception, exc_info=True)
 
         speak_output = "Sorry, I had trouble doing what you asked. Please try again."
 
@@ -221,23 +228,21 @@ class CatchAllExceptionHandler(AbstractExceptionHandler):
                 .response
         )
 
-# The SkillBuilder object acts as the entry point for your skill, routing all request and response
-# payloads to the handlers above. Make sure any new handlers or interceptors you've
-# defined are included below. The order matters - they're processed top to bottom.
-
 
 sb = SkillBuilder()
 
 sb.add_request_handler(LaunchRequestHandler())
-sb.add_request_handler(HelloWorldIntentHandler())
 
 sb.add_request_handler(getSensorDataIntentHandler())
+sb.add_request_handler(getOneSensorValueIntentHandler())
+sb.add_request_handler(deleteValuesIntentHandler())
+sb.add_request_handler(changeIntervalIntentHandler())
 
 sb.add_request_handler(HelpIntentHandler())
 sb.add_request_handler(CancelOrStopIntentHandler())
 sb.add_request_handler(FallbackIntentHandler())
 sb.add_request_handler(SessionEndedRequestHandler())
-sb.add_request_handler(IntentReflectorHandler()) # make sure IntentReflectorHandler is last so it doesn't override your custom intent handlers
+sb.add_request_handler(IntentReflectorHandler())
 
 sb.add_exception_handler(CatchAllExceptionHandler())
 
