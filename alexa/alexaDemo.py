@@ -15,28 +15,23 @@ headers = {
   'api-key': api, 
 }
 
-find = json.dumps({
+insertJson = json.dumps({
             "collection": "plant1",
             "database": "plants",
             "dataSource": "Cluster0",
-            "projection": {
-                "_id": 0,
+            "document": {
+                "Timestamp": 1, 
                 "Light": 1,
                 "Temperature": 1,
                 "Humidity": 1,
                 "SoilMoisture": 1,
-                "Timestamp": 1,
-            },
-            "sort": { "Timestamp": -1 },
-            "limit": 1
+                "delete": 1
+            }
         })
 
-dataResponse = json.loads(requests.request("POST", findUrl, headers=headers, data=find).text)
+
 
 try:
-  if dataResponse["documents"]==[]:
-    raise Exception("The database is empty.")
-                
-  speak_output = "On your plant, the latest sensor values measured are: Light: " + str(dataResponse["documents"][0]["Light"]) + ", Temperature: " + str(dataResponse["documents"][0]["Temperature"]) + ", Humidity: " + str(dataResponse["documents"][0]["Humidity"])  + ", SoilMoisture: " + str(dataResponse["documents"][0]["SoilMoisture"]) 
+  dataResponse = json.loads(requests.request("POST", insertUrl, headers=headers, data=insertJson).text)
 except Exception as e:
   print(str(e))

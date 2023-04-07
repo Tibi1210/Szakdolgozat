@@ -1,28 +1,23 @@
 
 import ask_sdk_core.utils as ask_utils
-
 from ask_sdk_core.skill_builder import SkillBuilder
-from ask_sdk_core.dispatch_components import AbstractRequestHandler
-from ask_sdk_core.dispatch_components import AbstractExceptionHandler
+from ask_sdk_core.dispatch_components import AbstractRequestHandler, AbstractExceptionHandler
 from ask_sdk_core.handler_input import HandlerInput
-
-from ask_sdk_model import IntentConfirmationStatus
-from ask_sdk_model import Response
+from ask_sdk_model import IntentConfirmationStatus,Response
 
 import requests
 import json
 
+mongoUrls = {
+    'findUrl': "https://data.mongodb-api.com/app/data-ojsvg/endpoint/data/v1/action/find",
+    'deleteUrl': "https://data.mongodb-api.com/app/data-ojsvg/endpoint/data/v1/action/deleteMany",
+    'updateUrl': "https://data.mongodb-api.com/app/data-ojsvg/endpoint/data/v1/action/updateOne",
+}
 
-findOneUrl = "https://data.mongodb-api.com/app/data-ojsvg/endpoint/data/v1/action/findOne"
-findUrl = "https://data.mongodb-api.com/app/data-ojsvg/endpoint/data/v1/action/find"
-deleteUrl = "https://data.mongodb-api.com/app/data-ojsvg/endpoint/data/v1/action/deleteMany"
-updateUrl = "https://data.mongodb-api.com/app/data-ojsvg/endpoint/data/v1/action/updateOne"
-
-api=""
-headers = {
-  'Content-Type': 'application/json',
-  'Access-Control-Request-Headers': '*',
-  'api-key': api, 
+mongoHeaders = {
+    'Content-Type': 'application/json',
+    'Access-Control-Request-Headers': '*',
+    'api-key': "",
 }
 
 
@@ -31,9 +26,12 @@ class LaunchRequestHandler(AbstractRequestHandler):
         return ask_utils.is_request_type("LaunchRequest")(handler_input)
 
     def handle(self, handler_input):
-        return handler_input.response_builder.speak("Welcome, what do you want to know about your plants?").response
+        handler_input.attributes_manager.session_attributes['waiting_for_response'] = True
 
+        speech_text = "Welcome, what do you want to know about your plant?"
+        reprompt_text = "What do you want to know about your plant?"
 
+        return handler_input.response_builder.speak(speech_text).ask(reprompt_text).response
 
 class getSensorDataIntentHandler(AbstractRequestHandler):
     def can_handle(self, handler_input):
@@ -57,15 +55,19 @@ class getSensorDataIntentHandler(AbstractRequestHandler):
             "limit": 1
         })
 
-        dataResponse = json.loads(requests.request("POST", findUrl, headers=headers, data=findData).text)
-
         try:
-            speak_output = "On your plant, the latest sensor values measured are: Light: " + str(dataResponse["documents"][0]["Light"]) + ", Temperature: " + str(dataResponse["documents"][0]["Temperature"]) + ", Humidity: " + str(dataResponse["documents"][0]["Humidity"])  + ", SoilMoisture: " + str(dataResponse["documents"][0]["SoilMoisture"]) 
-        except:
-            speak_output = "The database is probably empty."
+            dataResponse = json.loads(requests.request("POST", mongoUrls["findUrl"], headers=mongoHeaders, data=findData).text)
+
+            if dataResponse["documents"]==[]:
+                raise Exception("The database is empty.")
+
+            dataTable=dataResponse["documents"][0]      
+            speak_output = "On your plant, the latest sensor values measured are: Light: " + str(dataTable["Light"]) + ", Temperature: " + str(dataTable["Temperature"]) + ", Humidity: " + str(dataTable["Humidity"])  + ", Soil Moisture: " + str(dataTable["SoilMoisture"]) 
+
+        except Exception as e:
+            speak_output = str(e)
 
         return handler_input.response_builder.speak(speak_output).response
-
 
 class getOneSensorValueIntentHandler(AbstractRequestHandler):
     def can_handle(self, handler_input):
@@ -89,17 +91,20 @@ class getOneSensorValueIntentHandler(AbstractRequestHandler):
             "limit": 1
         })
         
-        dataResponse = json.loads(requests.request("POST", findUrl, headers=headers, data=findData).text)
-        
-        slot_value = handler_input.request_envelope.request.intent.slots['sensor'].resolutions.resolutions_per_authority[0].values[0].value.name
-
         try:
-            speak_output = "On your plant, the latest "+slot_value+" value measured is: " + str(dataResponse["documents"][0][slot_value])
-        except:
-            speak_output = "The database is probably empty. ("+slot_value+")"
+            dataResponse = json.loads(requests.request("POST", mongoUrls["findUrl"], headers=mongoHeaders, data=findData).text)
+            slot_value = handler_input.request_envelope.request.intent.slots['sensor'].resolutions.resolutions_per_authority[0].values[0].value.name
+
+            if dataResponse["documents"]==[]:
+                raise Exception("The database is empty.")
+
+            dataTable=dataResponse["documents"][0]     
+            speak_output = "On your plant, the latest "+slot_value+" value measured is: " + str(dataTable[slot_value])
+
+        except Exception as e:
+            speak_output = str(e)
 
         return handler_input.response_builder.speak(speak_output).response
-
 
 class deleteValuesIntentHandler(AbstractRequestHandler):
     def can_handle(self, handler_input):
@@ -107,13 +112,6 @@ class deleteValuesIntentHandler(AbstractRequestHandler):
 
     def handle(self, handler_input):
         
-        confirmation_status = handler_input.request_envelope.request.intent.confirmation_status
-
-        if confirmation_status == IntentConfirmationStatus.DENIED:
-            speak_output = 'Okay, I won\'t do that.'
-        elif confirmation_status == IntentConfirmationStatus.CONFIRMED:
-            speak_output = 'Great, your data will be erased.'
-            
         dataDelete = json.dumps({
             "collection": "plant1",
             "database": "plants",
@@ -121,12 +119,19 @@ class deleteValuesIntentHandler(AbstractRequestHandler):
             "filter": { "delete": 1 },
               }
         )
-        
-        requests.request("POST", deleteUrl, headers=headers, data=dataDelete)
+
+        confirmation_status = handler_input.request_envelope.request.intent.confirmation_status
+
+        if confirmation_status == IntentConfirmationStatus.CONFIRMED:
+            speak_output = "Great, your data will be erased."
+            try:
+                requests.request("POST", mongoUrls["deleteUrl"], headers=mongoHeaders, data=dataDelete)
+            except Exception:
+                speak_output = "Something went wrong while deleting your data,try again later."
+        else:
+            speak_output = "Okay, I won't do that."
             
         return handler_input.response_builder.speak(speak_output).response
-
-
 
 class changeIntervalIntentHandler(AbstractRequestHandler):
     def can_handle(self, handler_input):
@@ -136,30 +141,69 @@ class changeIntervalIntentHandler(AbstractRequestHandler):
 
         try:
             slot_value = int(handler_input.request_envelope.request.intent.slots['number'].value)
-            if slot_value<=0:
-                raise Exception("negative") 
-        except:
-            return handler_input.response_builder.speak("You must choose a non-negative whole number, please try again.").response
-        
-        data = json.dumps({
+
+            data = json.dumps({
             "collection": "device1",
             "database": "devices",
             "dataSource": "Cluster0",
             "filter": { "_id": 1 },
               "update": {
                   "$set": {
-                      "interval": int(slot_value),
+                      "interval": slot_value,
                       }
                   }
-              }
-        )
-
-        try:
-            response = requests.request("POST", updateUrl, headers=headers, data=data)
-            speak_output = "Your scanning interval will be changed to "+str(slot_value)+" times a day, after the next scan."
-        except:
-            speak_output = "Something went wrong while changing the interval."
+            })
+            
+            if slot_value<=0:
+                raise Exception("You must choose a number between one and five, please try again.")
+            if slot_value>5:
+                raise Exception("The maximum number of reading is five times a day, please try again.")
+            
+            try:
+                response = requests.request("POST", mongoUrls["updateUrl"], headers=mongoHeaders, data=data)
+                speak_output = "Your scanning interval will be changed to "+str(slot_value)+" times a day, after the next scan."
+            except:
+                speak_output = "Something went wrong while changing the interval."
+                
+        except Exception as e:
+            return handler_input.response_builder.speak(str(e)).response
         
+        return handler_input.response_builder.speak(speak_output).response
+
+class changePumpStateIntentHandler(AbstractRequestHandler):
+    def can_handle(self, handler_input):
+        return ask_utils.is_intent_name("changePumpStateIntent")(handler_input)
+
+    def handle(self, handler_input):
+
+        confirmation_status = handler_input.request_envelope.request.intent.confirmation_status
+
+        if confirmation_status == IntentConfirmationStatus.CONFIRMED:
+            try:
+                slot_value = int(handler_input.request_envelope.request.intent.slots['state'].resolutions.resolutions_per_authority[0].values[0].value.name)           
+                
+                data = json.dumps({
+                "collection": "device1",
+                "database": "devices",
+                "dataSource": "Cluster0",
+                "filter": { "_id": 1 },
+                "update": {
+                    "$set": {
+                        "pump": int(slot_value),
+                        }
+                    }
+                })
+
+                response = requests.request("POST", mongoUrls["updateUrl"], headers=mongoHeaders, data=data)
+                if slot_value==0:
+                    speak_output = "You disabled the watering system."
+                else:
+                    speak_output = "You enabled the watering system. If the soil moisture level is below 30, your plant will be watered."
+            except:
+                speak_output = "Something went wrong while changing the pump state."
+        else:
+            speak_output = "Okay, I won't do that."
+            
         return handler_input.response_builder.speak(speak_output).response
 
 
@@ -168,10 +212,12 @@ class HelpIntentHandler(AbstractRequestHandler):
         return ask_utils.is_intent_name("AMAZON.HelpIntent")(handler_input)
 
     def handle(self, handler_input):
-        speak_output = "You can ask me about your plants data values or set the measuring interval for the sensors! How can I help?"
+        handler_input.attributes_manager.session_attributes['waiting_for_response'] = True
 
-        return handler_input.response_builder.speak(speak_output).response
+        speak_output = "You can ask me about your plant or set the measuring interval for the sensors! How can I help?"
+        reprompt_text = "What do you want to know about your plant?"
 
+        return handler_input.response_builder.speak(speak_output).ask(reprompt_text).response
 
 class CancelOrStopIntentHandler(AbstractRequestHandler):
     def can_handle(self, handler_input):
@@ -179,18 +225,17 @@ class CancelOrStopIntentHandler(AbstractRequestHandler):
                 ask_utils.is_intent_name("AMAZON.StopIntent")(handler_input))
 
     def handle(self, handler_input):
-        speak_output = "Goodbye!"
+        speak_output = "Plant analyser closed."
 
-        return handler_input.response_builder.speak(speak_output).response
-
+        return handler_input.response_builder.speak(speak_output).set_should_end_session(True).response
 
 class FallbackIntentHandler(AbstractRequestHandler):
     def can_handle(self, handler_input):
         return ask_utils.is_intent_name("AMAZON.FallbackIntent")(handler_input)
 
     def handle(self, handler_input):
-        speech = "Hmm, I'm not sure."
-        reprompt = "I didn't catch that. What can I help you with?"
+        reprompt = "Hmm, I'm not sure."
+        speech = "I didn't catch that. What can I help you with?"
 
         return handler_input.response_builder.speak(speech).ask(reprompt).response
 
@@ -201,17 +246,6 @@ class SessionEndedRequestHandler(AbstractRequestHandler):
     def handle(self, handler_input):
 
         return handler_input.response_builder.response
-
-class IntentReflectorHandler(AbstractRequestHandler):
-    def can_handle(self, handler_input):
-        return ask_utils.is_request_type("IntentRequest")(handler_input)
-
-    def handle(self, handler_input):
-        intent_name = ask_utils.get_intent_name(handler_input)
-        speak_output = "You just triggered " + intent_name + "."
-
-        return handler_input.response_builder.speak(speak_output).response
-
 
 class CatchAllExceptionHandler(AbstractExceptionHandler):
     def can_handle(self, handler_input, exception):
@@ -237,12 +271,12 @@ sb.add_request_handler(getSensorDataIntentHandler())
 sb.add_request_handler(getOneSensorValueIntentHandler())
 sb.add_request_handler(deleteValuesIntentHandler())
 sb.add_request_handler(changeIntervalIntentHandler())
+sb.add_request_handler(changePumpStateIntentHandler())
 
 sb.add_request_handler(HelpIntentHandler())
 sb.add_request_handler(CancelOrStopIntentHandler())
 sb.add_request_handler(FallbackIntentHandler())
 sb.add_request_handler(SessionEndedRequestHandler())
-sb.add_request_handler(IntentReflectorHandler())
 
 sb.add_exception_handler(CatchAllExceptionHandler())
 
