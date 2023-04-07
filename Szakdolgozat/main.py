@@ -1,103 +1,94 @@
-def send_data(values):
+def send_data(sensorAvg):
     try:
         ntptime.settime()  
     except:  
         time.sleep(1)
-        send_data(values)
+        send_data(sensorAvg)
     try:
-        timedifference=946681200
-        timestamp = time.mktime(time.localtime())+timedifference
-        insert = json.dumps({
+        timeDiff=946681200
+        timeStamp = time.mktime(time.localtime())+timeDiff
+        insertJson = json.dumps({
             "collection": "plant1",
             "database": "plants",
             "dataSource": "Cluster0",
             "document": {
-                "Timestamp": timestamp, 
-                "Light": values[0],
-                "Temperature": values[1],
-                "Humidity": values[2],
-                "SoilMoisture": values[3],
+                "Timestamp": timeStamp, 
+                "Light": round(sensorAvg[0]),
+                "Temperature": sensorAvg[1],
+                "Humidity": sensorAvg[2],
+                "SoilMoisture": round(sensorAvg[3]),
                 "delete": 1
             }
         })
-        urequests.request("POST", insertUrl, headers=headers, data=insert)
-        return insert
+        urequests.request("POST", insertUrl, headers=headers, data=insertJson)
+        return insertJson
     except Exception as e:
         raise Exception("send_data(): "+str(e))
 
 def analog_read_light():
-    light1.on()
-    soil1.off()
+    lightPin.on()
+    soilPin.off()
     time.sleep(1)
-    max_light=950
-    min_light=0
-    light = (analog.read() - min_light) / (max_light - min_light) * 100
-    return light
+    maxLight=950
+    minLight=0
+    lightValue = (analogPin.read() - minLight) / (maxLight - minLight) * 100
+    return lightValue
 
 def analog_read_soil():
-    light1.off()
-    soil1.on()
+    lightPin.off()
+    soilPin.on()
     time.sleep(1)
-    min_moisture=31551
-    max_moisture=9215
-    moisture = (analog.read_u16() - min_moisture) / (max_moisture - min_moisture) * 100
-    return moisture
+    minMoisture=31551
+    maxMoisture=9215
+    soilMoisture = (analogPin.read_u16() - minMoisture) / (maxMoisture - minMoisture) * 100
+    return soilMoisture
 
-def measureDHT():
+def measure_DHT():
     try:
-        temp1.measure()
+        tempSensorPin.measure()
     except:
         time.sleep(1)
-        measureDHT()
+        measure_DHT()
 
 def digial_read_temp():
-    measureDHT()
-    temp = temp1.temperature()
-    hum = temp1.humidity()
-    return [temp,hum]
+    measure_DHT()
+    sensorTemp = tempSensorPin.temperature()
+    sensorHum = tempSensorPin.humidity()
+    return [sensorTemp,sensorHum]
 
-def avg_data(value):
+def avg_data(intervalValue):
     try:
-        samplesize=value*2
-        interval=round(86400/value/samplesize)
-        if interval<1:
-            interval=1
+        sampleSize=intervalValue*2
+        scanInterval=round(86400/intervalValue/sampleSize)
+        if scanInterval<1:
+            scanInterval=1
 
-        sum_light=0
-        sum_temp=0
-        sum_soil=0
-        sum_humid=0
+        sumLight=sumTemp=sumSoil=sumHumid=0
 
-        i=0
-        samplesize=5
-        interval=1
-        while i<samplesize:
-            temp,hum=digial_read_temp()
+        for i in range(sampleSize):
+            tempValue, humValue = digial_read_temp()
+            sumLight += analog_read_light()
+            sumTemp += tempValue
+            sumHumid += humValue
+            sumSoil += analog_read_soil()
+            time.sleep(scanInterval)
 
-            sum_light += analog_read_light()
-            sum_temp += temp
-            sum_humid += hum
-            sum_soil += analog_read_soil()
-            time.sleep(interval)
-            i+=1
+        avgLight=sumLight/sampleSize
+        avgTemp=sumTemp/sampleSize
+        avgHumid=sumHumid/sampleSize
+        avgSoil=sumSoil/sampleSize
 
-        i=0
-        avg_light=sum_light/samplesize
-        avg_temp=sum_temp/samplesize
-        avg_humid=sum_humid/samplesize
-        avg_soil=sum_soil/samplesize
-
-        return [avg_light,avg_temp,avg_humid,avg_soil]
+        return [avgLight,avgTemp,avgHumid,avgSoil]
     except Exception as e:
         raise Exception("avg_data(): "+str(e))
 
-def waterpump_toggle(moisture):
-    if moisture<10:
-            relay1.on()
-            time.sleep(3)
-            relay1.off()
+def waterpump_toggle(soilMoisture):
+    if soilMoisture<30:
+        relayPin.on()
+        time.sleep(3)
+        relayPin.off()
 
-def get_interval():
+def get_settings():
     try:
         findData = json.dumps({
             "collection": "device1",
@@ -113,33 +104,34 @@ def get_interval():
             }
         })
         dataResponse = json.loads(urequests.request("POST", findOneUrl, headers=headers, data=findData).text)
-        return dataResponse['document']['interval']
+        return dataResponse['document']['interval'],dataResponse['document']['pump']
     except Exception as e:
-        raise Exception("get_interval(): "+str(e))
+        raise Exception("get_settings(): "+str(e))
 
 
 
 
 
-hiba=False
-while not hiba:
+exceptionRaised=False
+while not exceptionRaised:
     try:    
-        interval=get_interval()
+        scanInterval,pumpState=get_settings()
 
-        avg=avg_data(interval)  
+        sensorAvg=avg_data(scanInterval)  
 
-        send=send_data(avg) 
-        print(send)
+        sentData=send_data(sensorAvg) 
+        print(sentData)
         print()
 
-        #waterpump_toggle(avg[3])
+        if pumpState:
+            waterpump_toggle(sensorAvg[3])
 
     except Exception as e:
-        relay1.off()
-        led.off()
-        hiba=True
+        relayPin.off()
+        ledPin.off()
+        exceptionRaised=True
 
-        html = """
+        htmlPage = """
         <!DOCTYPE html>
         <html>
         <head>
@@ -148,12 +140,13 @@ while not hiba:
         <body>
             <h1>MAIN</h1>
             <h2>"""+str(e)+"""</h2>
+            <h2>Restart required</h2>
         </body>
         </html>
         """
 
-        client_sock, client_addr = server_sock.accept()
-        serve(client_sock,html)
+        clientSocket, clientAddress = serverSocket.accept()
+        serve(clientSocket,htmlPage)
 
 
         

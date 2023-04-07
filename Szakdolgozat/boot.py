@@ -11,14 +11,14 @@ import urequests
 import ujson as json
 import dht
 
-analog = ADC(0)
-light1 = Pin(0, Pin.OUT)
-soil1 = Pin(14, Pin.OUT)
-led = Pin(2, Pin.OUT)
-temp1 = dht.DHT11(Pin(5))
-relay1 = Pin(4, Pin.OUT)
-relay1.off()
-led.off()
+analogPin = ADC(0)
+lightPin = Pin(0, Pin.OUT)
+soilPin = Pin(14, Pin.OUT)
+ledPin = Pin(2, Pin.OUT)
+tempSensorPin = dht.DHT11(Pin(5))
+relayPin = Pin(4, Pin.OUT)
+relayPin.off()
+ledPin.off()
 
 insertUrl = "https://data.mongodb-api.com/app/data-ojsvg/endpoint/data/v1/action/insertOne"
 findOneUrl = "https://data.mongodb-api.com/app/data-ojsvg/endpoint/data/v1/action/findOne"
@@ -34,13 +34,13 @@ headers = {
 }
 
 
-station = network.WLAN(network.STA_IF)
-station.active(True)
-station.connect(ssid, password)
-ap_if = network.WLAN(network.AP_IF)
-ap_if.active(False)
+wlanStation = network.WLAN(network.STA_IF)
+wlanStation.active(True)
+wlanStation.connect(ssid, password)
+accessPoint = network.WLAN(network.AP_IF)
+accessPoint.active(False)
 
-while station.isconnected() == False:
+while wlanStation.isconnected() == False:
   pass
 
 def begin_settime():
@@ -48,7 +48,7 @@ def begin_settime():
     ntptime.host = "1.europe.pool.ntp.org"
     ntptime.settime()
   except Exception as e:
-    html = """
+    htmlPage = """
         <!DOCTYPE html>
         <html>
         <head>
@@ -57,26 +57,27 @@ def begin_settime():
         <body>
             <h1>BOOT</h1>
             <h2>"""+str(e)+"""</h2>
+            <h2>Restart required</h2>
         </body>
         </html>
         """
 
-    client_sock, client_addr = server_sock.accept()
-    serve(client_sock,html)
+    clientSocket, clientAddress = serverSocket.accept()
+    serve(clientSocket,htmlPage)
 
-def serve(client_sock,html):
-    request = client_sock.recv(1024)
-    response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + html
-    client_sock.send(response)
-    client_sock.close()
+def serve(clientSocket,htmlPage):
+    request = clientSocket.recv(1024)
+    response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + htmlPage
+    clientSocket.send(response)
+    clientSocket.close()
 
-server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server_sock.bind(('0.0.0.0', 80))
-server_sock.listen(1)
+serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+serverSocket.bind(('0.0.0.0', 80))
+serverSocket.listen(1)
 
 
 print()
 print('Connection successful')
-print(station.ifconfig())
+print(wlanStation.ifconfig())
 begin_settime()
-led.on()
+ledPin.on()

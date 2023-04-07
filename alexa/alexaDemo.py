@@ -31,7 +31,12 @@ find = json.dumps({
             "limit": 1
         })
 
-response = requests.request("POST", findUrl, headers=headers, data=find)
-r = json.loads(response.text)
+dataResponse = json.loads(requests.request("POST", findUrl, headers=headers, data=find).text)
 
-print(r)
+try:
+  if dataResponse["documents"]==[]:
+    raise Exception("The database is empty.")
+                
+  speak_output = "On your plant, the latest sensor values measured are: Light: " + str(dataResponse["documents"][0]["Light"]) + ", Temperature: " + str(dataResponse["documents"][0]["Temperature"]) + ", Humidity: " + str(dataResponse["documents"][0]["Humidity"])  + ", SoilMoisture: " + str(dataResponse["documents"][0]["SoilMoisture"]) 
+except Exception as e:
+  print(str(e))
