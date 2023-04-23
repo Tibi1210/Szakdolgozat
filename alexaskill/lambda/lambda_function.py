@@ -93,7 +93,11 @@ class getOneSensorValueIntentHandler(AbstractRequestHandler):
         
         try:
             dataResponse = json.loads(requests.request("POST", mongoUrls["findUrl"], headers=mongoHeaders, data=findData).text)
-            slot_value = handler_input.request_envelope.request.intent.slots['sensor'].resolutions.resolutions_per_authority[0].values[0].value.name
+            slot_value = (handler_input
+                            .request_envelope.request.intent
+                            .slots['sensor'].resolutions.resolutions_per_authority[0]
+                            .values[0].value.name
+                            )
 
             if dataResponse["documents"]==[]:
                 raise Exception("The database is empty.")

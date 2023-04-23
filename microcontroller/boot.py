@@ -24,8 +24,10 @@ insertUrl = "https://data.mongodb-api.com/app/data-ojsvg/endpoint/data/v1/action
 findOneUrl = "https://data.mongodb-api.com/app/data-ojsvg/endpoint/data/v1/action/findOne"
 
 api=""
+
 ssid = ''
 password = ''
+
 
 headers = {
   'Content-Type': 'application/json',

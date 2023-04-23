@@ -1,0 +1,340 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "plant analyser",
+      "intents": [
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "getSensorDataIntent",
+          "slots": [],
+          "samples": [
+            "what are the latest values of my plant",
+            "show me the latest values of my plant",
+            "what are the latest sensor values",
+            "show the data of my plant",
+            "tell me the values of my plant",
+            "tell me the sensor values",
+            "the latest sensor data",
+            "the latest sensor values",
+            "all the data of my plant",
+            "all the values of my plant",
+            "how is my plant doing"
+          ]
+        },
+        {
+          "name": "deleteValuesIntent",
+          "slots": [],
+          "samples": [
+            "erase all the plant data",
+            "delete all plant information",
+            "clear all plant data",
+            "remove all plant data",
+            "delete all plant data"
+          ]
+        },
+        {
+          "name": "getOneSensorValueIntent",
+          "slots": [
+            {
+              "name": "sensor",
+              "type": "sensorSlot",
+              "samples": [
+                "{sensor}",
+                "the {sensor} one",
+                "{sensor} value"
+              ]
+            }
+          ],
+          "samples": [
+            "can you give me the {sensor} value for my plant",
+            "tell me the {sensor} reading for my plant",
+            "what\u0027s the current {sensor} value for my plant",
+            " give me the {sensor} data for my plant",
+            "what is the latest {sensor} reading for my plant",
+            "can you tell me the latest {sensor} value for my plant",
+            "what\u0027s the {sensor} value for my plant",
+            "what\u0027s the {sensor} reading for my plant"
+          ]
+        },
+        {
+          "name": "changeIntervalIntent",
+          "slots": [
+            {
+              "name": "number",
+              "type": "AMAZON.NUMBER",
+              "samples": [
+                "{number} times",
+                "{number} times a day",
+                "I would like to scan my plant {number} times a day.",
+                "change my plant\u0027s scanning schedule to {number} times a day",
+                "set my plant\u0027s scanning frequency to {number}  times a day"
+              ]
+            }
+          ],
+          "samples": [
+            "can you set my plant\u0027s scanning frequency to {number} times a day",
+            "change my plant\u0027s scanning schedule to {number} times a day",
+            "I would like to scan my plant {number} times a day",
+            "set the number of times to scan my plant to {number} times a day",
+            "adjust the scanning interval of my plant to {number} times a day",
+            "can you adjust my plant\u0027s scanning interval to {number} times a day",
+            "I want to scan my plant {number} times a day",
+            "update the scanning frequency of my plant to {number} times a day",
+            "change the scanning interval for my plant to {number} times a day",
+            "set the scanning interval for my plant to {number} times a day"
+          ]
+        },
+        {
+          "name": "changePumpStateIntent",
+          "slots": [
+            {
+              "name": "state",
+              "type": "booleanSlot",
+              "samples": [
+                "I want to turn the watering {state}",
+                "I want to {state} the watering.",
+                "please turn the watering {state}",
+                "{state}"
+              ]
+            }
+          ],
+          "samples": [
+            "can you turn {state} the watering on my plant",
+            "please turn {state} the watering on my plant",
+            "{state} the watering on my plant",
+            "I want to {state} the watering for my plant",
+            "can you {state} watering for my plant",
+            "please {state} watering for my plant",
+            "turn {state} watering for my plant"
+          ]
+        }
+      ],
+      "types": [
+        {
+          "values": [
+            {
+              "name": {
+                "value": "Humidity"
+              }
+            },
+            {
+              "name": {
+                "value": "Temperature"
+              }
+            },
+            {
+              "name": {
+                "value": "SoilMoisture",
+                "synonyms": [
+                  "soil moisture",
+                  "soil"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Light",
+                "synonyms": [
+                  "bright",
+                  "brightness"
+                ]
+              }
+            }
+          ],
+          "name": "sensorSlot"
+        },
+        {
+          "values": [
+            {
+              "name": {
+                "value": "0",
+                "synonyms": [
+                  "disabled",
+                  "disable",
+                  "off"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "1",
+                "synonyms": [
+                  "enabled",
+                  "enable",
+                  "on"
+                ]
+              }
+            }
+          ],
+          "name": "booleanSlot"
+        }
+      ]
+    },
+    "dialog": {
+      "intents": [
+        {
+          "name": "deleteValuesIntent",
+          "confirmationRequired": true,
+          "prompts": {
+            "confirmation": "Confirm.Intent.1187052714641"
+          },
+          "slots": []
+        },
+        {
+          "name": "getOneSensorValueIntent",
+          "confirmationRequired": false,
+          "prompts": {},
+          "slots": [
+            {
+              "name": "sensor",
+              "type": "sensorSlot",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": {
+                "elicitation": "Elicit.Slot.1294863197867.1094911968556"
+              }
+            }
+          ]
+        },
+        {
+          "name": "changeIntervalIntent",
+          "confirmationRequired": false,
+          "prompts": {},
+          "slots": [
+            {
+              "name": "number",
+              "type": "AMAZON.NUMBER",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": {
+                "elicitation": "Elicit.Slot.1544151485680.966318405881"
+              }
+            }
+          ]
+        },
+        {
+          "name": "changePumpStateIntent",
+          "confirmationRequired": true,
+          "prompts": {
+            "confirmation": "Confirm.Intent.1045003238310"
+          },
+          "slots": [
+            {
+              "name": "state",
+              "type": "booleanSlot",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": {
+                "elicitation": "Elicit.Slot.1045003238310.1159698626755"
+              }
+            }
+          ]
+        }
+      ],
+      "delegationStrategy": "ALWAYS"
+    },
+    "prompts": [
+      {
+        "id": "Confirm.Intent.1187052714641",
+        "variations": [
+          {
+            "type": "PlainText",
+            "value": "Are you sure you want to delete all your data?"
+          }
+        ]
+      },
+      {
+        "id": "Elicit.Slot.1294863197867.1094911968556",
+        "variations": [
+          {
+            "type": "PlainText",
+            "value": "Which sensor\u0027s value do you want to know?"
+          },
+          {
+            "type": "PlainText",
+            "value": "Which value did you want to check?"
+          }
+        ]
+      },
+      {
+        "id": "Elicit.Slot.1544151485680.966318405881",
+        "variations": [
+          {
+            "type": "PlainText",
+            "value": "How often should I scan your plant?"
+          },
+          {
+            "type": "PlainText",
+            "value": "How frequently would you like to scan your plant?"
+          },
+          {
+            "type": "PlainText",
+            "value": "Please provide the number of times you want to scan your plant each day?"
+          },
+          {
+            "type": "PlainText",
+            "value": "How many times a day would you like to scan your plant?"
+          },
+          {
+            "type": "PlainText",
+            "value": "Can you please tell me the number of times you want to scan your plant?"
+          }
+        ]
+      },
+      {
+        "id": "Elicit.Slot.1045003238310.1159698626755",
+        "variations": [
+          {
+            "type": "PlainText",
+            "value": "Let me confirm, are you looking to turn the watering on or off?"
+          },
+          {
+            "type": "PlainText",
+            "value": "Certainly. Could you please let me know whether you\u0027d like to enable or disable the watering?"
+          },
+          {
+            "type": "PlainText",
+            "value": "Sure, I can help you with that. Would you like me to turn the watering on or off?"
+          },
+          {
+            "type": "PlainText",
+            "value": "Sure, please tell me if you want me to turn on or off the plant\u0027s watering?"
+          },
+          {
+            "type": "PlainText",
+            "value": "What did you wanted to do with the watering system?"
+          }
+        ]
+      },
+      {
+        "id": "Confirm.Intent.1045003238310",
+        "variations": [
+          {
+            "type": "PlainText",
+            "value": "Are you sure you want to change the watering system?"
+          }
+        ]
+      }
+    ]
+  },
+  "version": "33"
+}
